@@ -65,6 +65,62 @@ def query_rag_sync(
     return svc.query(question, mode=mode, user_roles=user_roles, company_id=company_id)
 
 
+# ── Document processing helpers ─────────────────────────────
+
+def calculate_md5_bytes(file_bytes: bytes) -> str:
+    """Calculate MD5 hash of file content for deduplication."""
+    import hashlib
+    hash_md5 = hashlib.md5()
+    hash_md5.update(file_bytes)
+    return hash_md5.hexdigest()
+
+
+def load_processed_metadata() -> dict[str, Any]:
+    """Load processed_files.json from RAG_base."""
+    meta_path = _rag_base / "processed_files.json"
+    if meta_path.exists():
+        with open(meta_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {"files": []}
+
+
+def process_document(
+    file_path: str,
+    *,
+    role_ids: list[str] | None = None,
+    company_id: str | None = None,
+) -> str:
+    """
+    Index a document through RAG-Anything.
+
+    Args:
+        file_path: absolute path to the saved file
+        role_ids: list of role IDs for RBAC
+        company_id: tenant ID
+
+    Returns:
+        doc_id (MD5 hash of the file content)
+    """
+    svc = get_rag_service()
+    output_dir = _rag_base / "output_for_report"
+    svc.process_document(
+        file_path,
+        str(output_dir),
+        role_ids=role_ids or ["public"],
+        company_id=company_id,
+    )
+    # Return the MD5 hash
+    with open(file_path, "rb") as f:
+        return calculate_md5_bytes(f.read())
+
+
+def get_input_dir() -> Path:
+    """Return the input directory for uploaded files (inside RAG_base)."""
+    d = _rag_base / "input"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
 # ── Graph structure access ──────────────────────────────────
 
 def _storage_dir() -> Path:

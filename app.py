@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 
 # Ensure project root is on path
@@ -60,6 +60,12 @@ class QueryResponse(BaseModel):
     elapsed_sec: float = 0.0
 
 
+class IndexResponse(BaseModel):
+    doc_id: str
+    message: str
+    filename: Optional[str] = None
+
+
 # ── Endpoints ────────────────────────────────────────────────
 
 @app.get("/", summary="Health Check")
@@ -71,8 +77,79 @@ def health_check():
             "Self-Correcting RAG (Groundedness + Relevance Gates)",
             "Locate-then-Read Planning",
             "CoT Query Rewriting",
+            "Document Upload & Indexing",
         ],
     }
+
+
+# ── Document Upload ──────────────────────────────────────────
+@app.post(
+    "/index-doc",
+    summary="Upload and Index Document",
+    description=(
+        "Upload a file and index it for RAG retrieval.\n\n"
+        "- `role_ids`: comma-separated role names (e.g. `developer,qa_lead`)\n"
+        "- `company_id`: tenant isolation ID\n"
+        "- Deduplication via MD5 hash — skips if already processed"
+    ),
+    response_model=IndexResponse,
+)
+async def index_doc(
+    file: UploadFile = File(..., description="The document file to upload"),
+    role_ids: str = Form("public", description="Comma-separated list of role IDs"),
+    company_id: str = Form(..., description="Company ID for tenant isolation"),
+):
+    from rag_bridge import (
+        calculate_md5_bytes,
+        load_processed_metadata,
+        process_document,
+        get_input_dir,
+    )
+
+    try:
+        content = await file.read()
+        doc_md5 = calculate_md5_bytes(content)
+
+        roles = [r.strip() for r in role_ids.split(",") if r.strip()]
+        if not roles:
+            roles = ["public"]
+
+        # Dedup check
+        metadata = load_processed_metadata()
+        for f_meta in metadata.get("files", []):
+            if f_meta.get("doc_id") == doc_md5 and f_meta.get("company_id") == company_id:
+                return IndexResponse(
+                    doc_id=doc_md5,
+                    message="existed",
+                    filename=f_meta.get("filename"),
+                )
+
+        # Save file to RAG_base/input/
+        input_dir = get_input_dir()
+        file_path = input_dir / file.filename
+
+        with open(file_path, "wb") as f:
+            f.write(content)
+
+        # Process through RAG-Anything
+        logger.info("Indexing document: %s (roles=%s, company=%s)", file.filename, roles, company_id)
+        process_document(
+            str(file_path),
+            role_ids=roles,
+            company_id=company_id,
+        )
+
+        return IndexResponse(
+            doc_id=doc_md5,
+            message="processed",
+            filename=file.filename,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Index error")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post(

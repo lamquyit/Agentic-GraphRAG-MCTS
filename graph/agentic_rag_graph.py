@@ -52,8 +52,6 @@ async def node_execute(state: AgenticRAGState) -> dict[str, Any]:
         enhanced_query=state.get("current_query", state["question"]),
         selected_sections=state.get("located_sections", []),
         mode=state.get("mode", "hybrid"),
-        user_roles=state.get("user_roles"),
-        company_id=state.get("company_id"),
     )
 
     return {
@@ -93,8 +91,6 @@ async def node_regenerate(state: AgenticRAGState) -> dict[str, Any]:
         enhanced_query=state.get("current_query", state["question"]),
         selected_sections=state.get("located_sections", []),
         mode=state.get("mode", "hybrid"),
-        user_roles=state.get("user_roles"),
-        company_id=state.get("company_id"),
     )
 
     return {
@@ -243,8 +239,6 @@ async def run_agentic_rag(
     question: str,
     *,
     mode: str = "hybrid",
-    user_roles: list[str] | None = None,
-    company_id: str | None = None,
     max_retries: int | None = None,
 ) -> dict[str, Any]:
     """
@@ -260,8 +254,6 @@ async def run_agentic_rag(
         "question": question,
         "current_query": question,
         "mode": mode,
-        "user_roles": user_roles,
-        "company_id": company_id,
         "retry_count": 0,
         "max_retries": retries,
         "generation_temperature": 0.7,

@@ -21,8 +21,6 @@ async def run_executor(
     selected_sections: list[dict[str, Any]],
     *,
     mode: str = "hybrid",
-    user_roles: list[str] | None = None,
-    company_id: str | None = None,
 ) -> dict[str, Any]:
     """
     Read phase: deep-read data from located sections via RAG-Anything.
@@ -63,8 +61,6 @@ async def run_executor(
         draft_answer = await query_rag(
             query_to_use,
             mode=mode,
-            user_roles=user_roles,
-            company_id=company_id,
         )
     except Exception as e:
         logger.error("RAG query failed: %s", e)

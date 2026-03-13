@@ -44,25 +44,21 @@ async def query_rag(
     question: str,
     *,
     mode: str = "hybrid",
-    user_roles: list[str] | None = None,
-    company_id: str | None = None,
 ) -> str:
     """Execute a query through RAG-Anything and return the answer string."""
     svc = get_rag_service()
     svc.initialize()
-    return await svc.aquery(question, mode=mode, user_roles=user_roles, company_id=company_id)
+    return await svc.aquery(question, mode=mode)
 
 
 def query_rag_sync(
     question: str,
     *,
     mode: str = "hybrid",
-    user_roles: list[str] | None = None,
-    company_id: str | None = None,
 ) -> str:
     svc = get_rag_service()
     svc.initialize()
-    return svc.query(question, mode=mode, user_roles=user_roles, company_id=company_id)
+    return svc.query(question, mode=mode)
 
 
 # ── Document processing helpers ─────────────────────────────
@@ -86,17 +82,12 @@ def load_processed_metadata() -> dict[str, Any]:
 
 def process_document(
     file_path: str,
-    *,
-    role_ids: list[str] | None = None,
-    company_id: str | None = None,
 ) -> str:
     """
     Index a document through RAG-Anything.
 
     Args:
         file_path: absolute path to the saved file
-        role_ids: list of role IDs for RBAC
-        company_id: tenant ID
 
     Returns:
         doc_id (MD5 hash of the file content)
@@ -106,8 +97,7 @@ def process_document(
     svc.process_document(
         file_path,
         str(output_dir),
-        role_ids=role_ids or ["public"],
-        company_id=company_id,
+        role_ids=["public"],
     )
     # Return the MD5 hash
     with open(file_path, "rb") as f:

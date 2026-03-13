@@ -45,8 +45,6 @@ app = FastAPI(
 class QueryRequest(BaseModel):
     question: str = "What is the main topic of the uploaded document?"
     mode: str = "hybrid"
-    user_roles: list[str] | None = None
-    company_id: str | None = None
 
 
 class QueryResponse(BaseModel):
@@ -96,8 +94,6 @@ def health_check():
 )
 async def index_doc(
     file: UploadFile = File(..., description="The document file to upload"),
-    role_ids: str = Form("public", description="Comma-separated list of role IDs"),
-    company_id: str = Form(..., description="Company ID for tenant isolation"),
 ):
     from rag_bridge import (
         calculate_md5_bytes,
@@ -117,7 +113,7 @@ async def index_doc(
         # Dedup check
         metadata = load_processed_metadata()
         for f_meta in metadata.get("files", []):
-            if f_meta.get("doc_id") == doc_md5 and f_meta.get("company_id") == company_id:
+            if f_meta.get("doc_id") == doc_md5:
                 return IndexResponse(
                     doc_id=doc_md5,
                     message="existed",
@@ -132,11 +128,9 @@ async def index_doc(
             f.write(content)
 
         # Process through RAG-Anything
-        logger.info("Indexing document: %s (roles=%s, company=%s)", file.filename, roles, company_id)
+        logger.info("Indexing document: %s", file.filename)
         process_document(
             str(file_path),
-            role_ids=roles,
-            company_id=company_id,
         )
 
         return IndexResponse(
@@ -171,8 +165,6 @@ async def query(req: QueryRequest):
         final_state = await run_agentic_rag(
             question=req.question,
             mode=req.mode,
-            user_roles=req.user_roles,
-            company_id=req.company_id,
         )
 
         elapsed = time.perf_counter() - t0
@@ -211,8 +203,6 @@ async def query_simple(req: QueryRequest):
         answer = await query_rag(
             req.question,
             mode=req.mode,
-            user_roles=req.user_roles,
-            company_id=req.company_id,
         )
         elapsed = time.perf_counter() - t0
 

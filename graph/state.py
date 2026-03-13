@@ -18,8 +18,6 @@ class AgenticRAGState(TypedDict, total=False):
     # ── Input ────────────────────────────────────────────────
     question: str                       # Original user question
     mode: str                           # RAG query mode (hybrid, local, global, ...)
-    user_roles: list[str] | None        # Optional RBAC roles
-    company_id: str | None              # Optional tenant ID
 
     # ── Planning ─────────────────────────────────────────────
     current_query: str                  # Current query (may be rewritten)

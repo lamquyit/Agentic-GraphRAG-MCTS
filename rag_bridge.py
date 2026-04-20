@@ -27,15 +27,14 @@ if str(_rag_anything_path) not in sys.path:
 
 from rag_service import RAGService  # noqa: E402
 
-# ── Singleton ───────────────────────────────────────────────
-_service: RAGService | None = None
+# ── RAG Service Initialization ───────────────────────────────
+_rag_services: dict[str, RAGService] = {}
 
-
-def get_rag_service() -> RAGService:
-    global _service
-    if _service is None:
-        _service = RAGService(_rag_base)
-    return _service
+def get_rag_service(storage_name: str = "rag_storage") -> RAGService:
+    """Get or create a RAGService instance for a specific storage."""
+    if storage_name not in _rag_services:
+        _rag_services[storage_name] = RAGService(_rag_base, storage_name=storage_name)
+    return _rag_services[storage_name]
 
 
 # ── Query helpers ───────────────────────────────────────────
@@ -44,21 +43,48 @@ async def query_rag(
     question: str,
     *,
     mode: str = "hybrid",
+    storage_name: str = "rag_storage"
 ) -> str:
     """Execute a query through RAG-Anything and return the answer string."""
-    svc = get_rag_service()
+    svc = get_rag_service(storage_name)
     svc.initialize()
     return await svc.aquery(question, mode=mode)
+
+
+async def aquery_rag_with_context(
+    question: str,
+    *,
+    mode: str = "hybrid",
+    storage_name: str = "rag_storage"
+) -> dict[str, Any]:
+    """Execute query (async) and return {'answer': str, 'contexts': list[str]}"""
+    svc = get_rag_service(storage_name)
+    svc.initialize()
+    return await svc.aquery_with_context(question, mode=mode)
 
 
 def query_rag_sync(
     question: str,
     *,
     mode: str = "hybrid",
+    storage_name: str = "rag_storage"
 ) -> str:
-    svc = get_rag_service()
+    """Execute query (sync) và trả về nội dung text."""
+    svc = get_rag_service(storage_name)
     svc.initialize()
     return svc.query(question, mode=mode)
+
+
+def query_rag_with_context(
+    question: str,
+    *,
+    mode: str = "hybrid",
+    storage_name: str = "rag_storage"
+) -> dict[str, Any]:
+    """Execute query and return {'answer': str, 'contexts': list[str]}"""
+    svc = get_rag_service(storage_name)
+    svc.initialize()
+    return svc.query_with_context(question, mode=mode)
 
 
 # ── Document processing helpers ─────────────────────────────
@@ -82,22 +108,25 @@ def load_processed_metadata() -> dict[str, Any]:
 
 def process_document(
     file_path: str,
+    storage_name: str = "rag_storage",
+    log_file: str = None
 ) -> str:
     """
     Index a document through RAG-Anything.
 
     Args:
         file_path: absolute path to the saved file
+        storage_name: name of the storage folder (rag_storage, etc.)
 
     Returns:
         doc_id (MD5 hash of the file content)
     """
-    svc = get_rag_service()
+    svc = get_rag_service(storage_name)
     output_dir = _rag_base / "output_for_report"
     svc.process_document(
         file_path,
         str(output_dir),
-        role_ids=["public"],
+        log_file=log_file
     )
     # Return the MD5 hash
     with open(file_path, "rb") as f:
@@ -113,11 +142,11 @@ def get_input_dir() -> Path:
 
 # ── Graph structure access ──────────────────────────────────
 
-def _storage_dir() -> Path:
-    return _rag_base / "rag_storage"
+def _storage_dir(storage_name: str = "rag_storage") -> Path:
+    return _rag_base / storage_name
 
 
-def load_graph_structure() -> dict[str, Any]:
+def load_graph_structure(storage_name: str = "rag_storage") -> dict[str, Any]:
     """
     Load the content graph hierarchy from RAG_base storage.
 
@@ -126,7 +155,7 @@ def load_graph_structure() -> dict[str, Any]:
         chunks:   list[dict]   — text chunks with metadata
         graph:    nx.Graph     — full entity-relation graph (if graphml exists)
     """
-    storage = _storage_dir()
+    storage = _storage_dir(storage_name)
     result: dict[str, Any] = {"entities": [], "chunks": [], "graph": None}
 
     # 1. Entities
@@ -151,8 +180,6 @@ def load_graph_structure() -> dict[str, Any]:
                 "content": chunk_data.get("content", ""),
                 "file_path": chunk_data.get("file_path", ""),
                 "doc_id": chunk_data.get("full_doc_id", ""),
-                "company_id": chunk_data.get("company_id"),
-                "role_ids": chunk_data.get("role_ids", []),
                 "tokens": chunk_data.get("tokens", 0),
             })
 
@@ -167,12 +194,12 @@ def load_graph_structure() -> dict[str, Any]:
     return result
 
 
-def get_entity_summary() -> list[dict[str, Any]]:
+def get_entity_summary(storage_name: str = "rag_storage") -> list[dict[str, Any]]:
     """
     Return a lightweight summary of all entities for the Planner Agent.
     Each item: {"doc_id": str, "file_path": str, "entity_names": list[str], "preview": str}
     """
-    gs = load_graph_structure()
+    gs = load_graph_structure(storage_name)
     entities = gs["entities"]
     chunks = gs["chunks"]
 
@@ -198,12 +225,12 @@ def get_entity_summary() -> list[dict[str, Any]]:
     return summaries
 
 
-def get_chunks_for_entities(entity_names: list[str]) -> list[dict[str, Any]]:
+def get_chunks_for_entities(entity_names: list[str], storage_name: str = "rag_storage") -> list[dict[str, Any]]:
     """
     Given a list of entity names, find and return matching text chunks.
     Matches by checking if any entity name appears in the chunk content.
     """
-    gs = load_graph_structure()
+    gs = load_graph_structure(storage_name)
     matching = []
     entity_lower = [e.lower() for e in entity_names]
 

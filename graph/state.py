@@ -18,6 +18,7 @@ class AgenticRAGState(TypedDict, total=False):
     # ── Input ────────────────────────────────────────────────
     question: str                       # Original user question
     mode: str                           # RAG query mode (hybrid, local, global, ...)
+    storage_name: str                   # RAG storage location
 
     # ── Planning ─────────────────────────────────────────────
     current_query: str                  # Current query (may be rewritten)

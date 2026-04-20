@@ -42,7 +42,7 @@ If the question is simple and targets a single obvious topic, set needs_planning
 and return just the enhanced_query without selecting sections."""
 
 
-async def run_planner(question: str) -> dict[str, Any]:
+async def run_planner(question: str, storage_name: str = "rag_storage") -> dict[str, Any]:
     """
     Locate phase: scan graph structure to determine which sections to read.
 
@@ -50,7 +50,7 @@ async def run_planner(question: str) -> dict[str, Any]:
         dict with keys: needs_planning, selected_sections, enhanced_query, reasoning
     """
     # Get entity summaries from the content graph
-    summaries = get_entity_summary()
+    summaries = get_entity_summary(storage_name)
 
     if not summaries:
         logger.warning("No entity summaries found — skipping planning, using direct query")

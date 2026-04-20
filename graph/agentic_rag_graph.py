@@ -36,7 +36,7 @@ async def node_plan(state: AgenticRAGState) -> dict[str, Any]:
     """Locate phase: scan graph structure to decide which sections to read."""
     query = state.get("current_query") or state["question"]
 
-    result = await run_planner(query)
+    result = await run_planner(query, storage_name=state.get("storage_name", "rag_storage"))
 
     return {
         "located_sections": result.get("selected_sections", []),
@@ -52,6 +52,7 @@ async def node_execute(state: AgenticRAGState) -> dict[str, Any]:
         enhanced_query=state.get("current_query", state["question"]),
         selected_sections=state.get("located_sections", []),
         mode=state.get("mode", "hybrid"),
+        storage_name=state.get("storage_name", "rag_storage"),
     )
 
     return {
@@ -91,6 +92,7 @@ async def node_regenerate(state: AgenticRAGState) -> dict[str, Any]:
         enhanced_query=state.get("current_query", state["question"]),
         selected_sections=state.get("located_sections", []),
         mode=state.get("mode", "hybrid"),
+        storage_name=state.get("storage_name", "rag_storage"),
     )
 
     return {
@@ -240,6 +242,7 @@ async def run_agentic_rag(
     *,
     mode: str = "hybrid",
     max_retries: int | None = None,
+    storage_name: str = "rag_storage",
 ) -> dict[str, Any]:
     """
     Run the full Agentic RAG pipeline.
@@ -254,6 +257,7 @@ async def run_agentic_rag(
         "question": question,
         "current_query": question,
         "mode": mode,
+        "storage_name": storage_name,
         "retry_count": 0,
         "max_retries": retries,
         "generation_temperature": 0.7,

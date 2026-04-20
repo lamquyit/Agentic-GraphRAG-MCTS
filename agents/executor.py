@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from rag_bridge import query_rag, get_chunks_for_entities
+from rag_bridge import aquery_rag_with_context, get_chunks_for_entities
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,7 @@ async def run_executor(
     selected_sections: list[dict[str, Any]],
     *,
     mode: str = "hybrid",
+    storage_name: str = "rag_storage",
 ) -> dict[str, Any]:
     """
     Read phase: deep-read data from located sections via RAG-Anything.
@@ -38,7 +39,7 @@ async def run_executor(
             all_entities.extend(sec.get("relevant_entities", []))
 
         if all_entities:
-            chunks = get_chunks_for_entities(all_entities)
+            chunks = get_chunks_for_entities(all_entities, storage_name=storage_name)
             for chunk in chunks:
                 extra_context_parts.append(
                     f"[From {chunk['file_path']}]: {chunk['content'][:500]}"
@@ -58,10 +59,13 @@ async def run_executor(
 
     # Execute through RAG-Anything
     try:
-        draft_answer = await query_rag(
+        res = await aquery_rag_with_context(
             query_to_use,
             mode=mode,
+            storage_name=storage_name,
         )
+        draft_answer = res.get("answer", "")
+        extra_context_parts.extend(res.get("contexts", []))
     except Exception as e:
         logger.error("RAG query failed: %s", e)
         draft_answer = f"Error during retrieval: {e}"
